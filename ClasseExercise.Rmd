@@ -1,0 +1,148 @@
+---
+title: "ClasseExercise"
+author: "Swetha Jegannathan"
+date: "01/10/2019"
+output: github_document
+
+---
+# PREDICT EXERCISE EFFECTIVENESS
+**Objective**
+Predict the manner and effectiveness of exercise done by 6 participants on accelerometers on the belt, forearm, arm, and dumbell on pml-testing.csv dataset for 20 different test cases. 
+Dependant variable is "classe" with 5 levels of classificaiton - A, B, C, D and E. The 6 users are - Adelmo
+Carlitos
+Charles
+Eurico
+Jeremy
+Pedro
+
+The participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+**Dataset**
+The datasets pml-training.csv and pml-testung.csv are imported into the system. The training dataset has 19622 rows and 160 variables and testing data set has 20 rows and 160 variables. There are lot of NAs, blanks and character variable in the dataset. which requires intensive cleaning.
+
+
+```{r}
+getwd()
+train <- read.csv("pml-training.csv", stringsAsFactors = FALSE)
+
+test <- read.csv("pml-testing.csv", stringsAsFactors = FALSE)
+set.seed(13243)
+
+dim(train)
+dim(test)
+```
+
+
+
+**Create Subset**
+Since the dataset has 19622 rows, for easy of calculation we take a subset of 5000 rows out of original training data
+```{r}
+
+
+train.sample <- sample(nrow(train), 5000) 
+
+train.subset <- train[train.sample,]
+
+```
+
+
+**Data Cleaning**
+Remove columns with NAs, blanks and unecessary characters. There are only 52 columns that qualify for building our predictive model. "classe" is the dependent variable,
+```{r}
+train.dropna <- train.subset[,colSums(is.na(train.subset)) < 100]
+train.dropchr <- train.dropna[, !sapply(train.dropna, is.character)] 
+train.final <- train.dropchr[,4:56]
+train.final$classe <- factor(train.subset$classe) #Re-insert classe column, convert to factor
+```
+
+
+
+**Data Partition in Training data**
+We partition our training data into train1 - 80% and train2 - 20%. We shall build our model on train1 and predict on train2 and use this model to predict the "classe" on 20 rows in testing data.
+
+```{r}
+#createDataPartition: Subset 20% of training data for cross-validation
+library(caret)
+trainIndex <- createDataPartition(y = train.final$classe, p=0.8, list = FALSE) 
+
+train1 <- train.final[trainIndex,]
+
+train2 <- train.final[-trainIndex,]
+
+dim(train1)
+
+str(train1)
+
+dim(train2)
+
+str(train2)
+```
+
+
+
+
+**Cross Validation**
+We are using 10 fold cross validation to allow the algorithm to build a model without biases due to adequate sampling. The algorithm will run 10 times and create a optimum model using the Gradient Decent machine learning algorithm. "classe" will be our predictor variable.
+
+**Build Model**
+We are using Gradient decent to build a machine learning algorithm on the train1 dataset.
+```{r}
+
+control <- trainControl(method="cv", number=10)
+model_gbm <- train(classe~. , data = train1 , method="gbm" , trControl=control ,  verbose = FALSE )
+model_gbm$finalModel
+```
+
+**Predict**
+Predict classes and probability on train2 model using the Gradient decent model build above.
+```{r}
+library(caret)
+#library(ModelMetrics)
+plsClasses <- predict(model_gbm, newdata = train2)
+str(plsClasses)
+plsProbs <- predict(model_gbm, newdata = train2, type = "prob")
+head(plsProbs)
+
+```
+
+**Important Variables**
+We identify the important variables contrubuting to understanding our predictor variable.
+Further, we plot the variable in the order of the importance.
+
+```{r}
+# Visualization
+library(gbm)
+library(caret)
+library(splines)
+library(parallel)
+library(plyr)
+require(RCurl)
+varImp(model_gbm)
+plot(varImp(model_gbm))
+
+plot(model_gbm)
+model_gbm
+```
+**Predict 20 classe variables on Test sample**
+Since we got good results on the model built on train1 and testing it on train2, we shall now use the same model to predict the "classe" on the 20 rows of testing data into A, B, C, D and E.
+```{r}
+cross_validation_results_boost <- predict(model_gbm , newdata = test)
+
+predict.test.gbm <- predict(model_gbm , newdata = test )
+predict.test.gbm
+
+plsClasses1 <- predict(model_gbm, newdata = test)
+plsClasses1
+str(plsClasses)
+plsProbs1 <- predict(model_gbm, newdata = test, type = "prob")
+head(plsProbs1)
+```
+
+**Prediction of "Classe" on 20 rows**
+```{r}
+plsClasses1 <- predict(model_gbm, newdata = test)
+
+data.frame("Predictions" = plsClasses1)
+```
+
+
